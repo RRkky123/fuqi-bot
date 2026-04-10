@@ -1,12 +1,17 @@
 """
 福氣天天領 — 全域設定
 """
+import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
     # LINE Bot
     line_channel_access_token: str = ""
@@ -16,9 +21,9 @@ class Settings(BaseSettings):
     liff_id: str = ""
     liff_base_url: str = "https://your-domain.com"
 
-    # Database
-    database_url: str = "postgresql+asyncpg://fuqi:fuqi_secret@localhost:5432/fuqi_bot"
-    database_url_sync: str = "postgresql://fuqi:fuqi_secret@localhost:5432/fuqi_bot"
+    # Database（由 database.py 的 _resolve_db_url 處理，這裡只作備用）
+    database_url: str = "sqlite+aiosqlite:///./fuqi_dev.db"
+    database_url_sync: str = "sqlite:///./fuqi_dev.db"
 
     # Redis
     redis_url: str = "redis://localhost:6379/0"
@@ -45,9 +50,9 @@ class Settings(BaseSettings):
     newebpay_api_url: str = "https://ccore.newebpay.com/MPG/mpg_gateway"
 
     # App
-    app_env: str = "development"
+    app_env: str = "production"   # Railway 預設 production
     app_secret_key: str = "change-me-in-production"
-    base_url: str = "https://your-domain.com"
+    base_url: str = ""            # Railway 部署後自動填入
 
     # 業務參數
     daily_free_limit: int = 1
@@ -61,6 +66,14 @@ class Settings(BaseSettings):
     @property
     def is_production(self) -> bool:
         return self.app_env == "production"
+
+    @property
+    def public_base_url(self) -> str:
+        """取得對外 URL（Railway 自動注入 RAILWAY_PUBLIC_DOMAIN）"""
+        railway_domain = os.environ.get("RAILWAY_PUBLIC_DOMAIN", "")
+        if railway_domain:
+            return f"https://{railway_domain}"
+        return self.base_url or "http://localhost:8000"
 
 
 @lru_cache
