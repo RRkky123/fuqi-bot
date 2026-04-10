@@ -1,0 +1,87 @@
+version: "3.9"
+
+services:
+  # ── 主應用程式 ──────────────────────────────────────────────
+  app:
+    build: .
+    container_name: fuqi_app
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./templates:/app/templates
+      - ./fonts:/app/fonts
+      - ./static:/app/static
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
+
+  # ── Celery Worker（AI 合成非同步任務） ──────────────────────
+  worker:
+    build: .
+    container_name: fuqi_worker
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - db
+      - redis
+    volumes:
+      - ./templates:/app/templates
+      - ./fonts:/app/fonts
+    command: celery -A workers.celery_app worker --loglevel=info --concurrency=4
+
+  # ── Celery Beat（排程任務：每日推播） ───────────────────────
+  beat:
+    build: .
+    container_name: fuqi_beat
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    command: celery -A workers.celery_app beat --loglevel=info
+
+  # ── Flower（Celery 監控 UI） ────────────────────────────────
+  flower:
+    build: .
+    container_name: fuqi_flower
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    env_file:
+      - .env
+    depends_on:
+      - redis
+    command: celery -A workers.celery_app flower --port=5555
+
+  # ── PostgreSQL ──────────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: fuqi_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: fuqi_bot
+      POSTGRES_USER: fuqi
+      POSTGRES_PASSWORD: fuqi_secret
+    ports:
+      - "5432:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+
+  # ── Redis ───────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: fuqi_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+
+volumes:
+  pg_data:
+  redis_data:
