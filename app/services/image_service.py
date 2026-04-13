@@ -22,28 +22,28 @@ FONT_PATH = FONTS_DIR / "NotoSansCJK-Regular.ttc"
 
 # ── 天氣條件對應 ──────────────────────────────────────────────
 CONDITION_EMOJI = {
-    "sunny": "☀️",
-    "cloudy": "⛅",
-    "rainy": "🌧️",
+    "sunny": "【晴天】",
+    "cloudy": "【多雲】",
+    "rainy": "【雨天】",
 }
 
 # 語錄庫（節氣、天氣對應，實際部署建議移至資料庫）
 QUOTES = {
     "sunny": [
-        "☀️ 陽光正好，願您今天笑顏如花！",
-        "☀️ 晴空萬里，好運與您同行！",
-        "🌸 美好的一天從現在開始！",
-        "✨ 太陽照耀，祝您健康平安！",
+        "陽光正好，願您今天笑顏如花！",
+        "晴空萬里，好運與您同行！",
+        "美好的一天從現在開始！",
+        "太陽照耀，祝您健康平安！",
     ],
     "cloudy": [
-        "⛅ 雲淡風輕，願您心情舒暢！",
-        "🌤️ 多雲的天，也有溫暖的心！",
-        "💛 平靜的天氣，平靜的心情，一切都好！",
+        "雲淡風輕，願您心情舒暢！",
+        "多雲的天，也有溫暖的心！",
+        "平靜的天氣，平靜的心情，一切都好！",
     ],
     "rainy": [
-        "🌧️ 下雨天別忘記帶傘，保重身體！",
-        "☔ 雨中有情，祝您出入平安！",
-        "🌂 雨過天晴，一切順心如意！",
+        "下雨天別忘記帶傘，保重身體！",
+        "雨中有情，祝您出入平安！",
+        "雨過天晴，一切順心如意！",
     ],
 }
 
@@ -93,12 +93,17 @@ def _get_font(size: int) -> ImageFont.FreeTypeFont:
     return ImageFont.load_default()
 
 
+def _strip_emoji(text: str) -> str:
+    """移除 emoji，保留中文與標點"""
+    import re
+    return re.sub(r'[^\u0000-\u4DFF\u4E00-\u9FFF\uF900-\uFFFF\u3000-\u303F\s\w°%｜【】「」。，！？、—\-/:.()（）]', '', text)
+
 def _get_quote(condition: str, display_name: str) -> str:
     quotes = QUOTES.get(condition, QUOTES["sunny"])
     import random
     base = random.choice(quotes)
-    # 插入使用者名稱
-    return f"祝 {display_name} 今天平安健康 🙏\n{base}"
+    base = _strip_emoji(base)
+    return f"祝 {display_name} 今天平安健康\n{base}"
 
 
 def _choose_template(condition: str, hour: int) -> Optional[Path]:
