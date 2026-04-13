@@ -160,13 +160,25 @@ async def _run_synthesis_and_push(job_id: str, line_uid: str, theme_id: str) -> 
         # 簡單延遲模擬處理中
         await asyncio.sleep(2)
 
-        # 開發模式：生成一張平安圖作為合成結果
+        # 開發模式：依主題生成示意圖
         from app.services.weather_service import WeatherData
+        theme_names = {
+            "spring_sakura": "花見春日", "tokyo_tower": "東京鐵塔",
+            "flower_bloom": "花開富貴", "fortune_god": "財神到府",
+            "lunar_new_year": "農曆新年", "cloud_sea": "天空雲海",
+        }
+        theme_name = theme_names.get(theme_id, theme_id)
+        conditions = {
+            "spring_sakura": "sunny", "tokyo_tower": "cloudy",
+            "flower_bloom": "sunny", "fortune_god": "sunny",
+            "lunar_new_year": "sunny", "cloud_sea": "cloudy",
+        }
         weather = WeatherData(
-            city="台北市", temp=25, feels_like=27,
-            description="晴天好心情", rain_prob=10, condition="sunny"
+            city=f"【{theme_name}】主題示意圖", temp=25, feels_like=27,
+            description="AI 合成中（測試版）", rain_prob=0,
+            condition=conditions.get(theme_id, "sunny")
         )
-        img_bytes = generate_peace_image(weather, "合成結果")
+        img_bytes = generate_peace_image(weather, "您的 AI 合成")
 
         # 儲存到本地
         import datetime

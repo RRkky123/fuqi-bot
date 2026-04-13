@@ -64,10 +64,9 @@ async def handle_message(event: MessageEvent, db: AsyncSession) -> None:
         await _handle_image_upload(event, db, user, state)
         return
 
-    # ── 位置訊息：天氣查詢 ────────────────────────────────────
+    # ── 位置訊息：天氣查詢（任何狀態都接受）────────────────────
     if isinstance(msg, LocationMessageContent):
-        if state in (UserState.WAITING_LOCATION, UserState.IDLE):
-            await _handle_location(event, db, user, msg)
+        await _handle_location(event, db, user, msg)
         return
 
     # ── 文字訊息 ──────────────────────────────────────────────
