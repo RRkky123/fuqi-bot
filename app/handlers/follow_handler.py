@@ -40,6 +40,11 @@ async def handle_follow(event: FollowEvent, db: AsyncSession) -> None:
         referrer_uid=referrer_uid,
     )
 
+    # 新用戶贈送 3 張免費合成券（測試期間免費）
+    if is_new:
+        await UserService.add_credits(db, line_uid, 3, reason="新用戶贈送（測試期）")
+        await db.commit()
+
     # 設定狀態：等待上傳頭像
     await set_user_state(line_uid, UserState.WAITING_AVATAR)
 

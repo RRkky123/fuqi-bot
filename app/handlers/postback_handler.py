@@ -79,13 +79,11 @@ async def _handle_start_synthesis(reply_token: str, db: AsyncSession, user) -> N
         ])
         return
 
-    # 確認點數
+    # 確認點數（測試期間若不足自動補 3 張）
     if user.credits <= 0:
-        liff_url = f"https://liff.line.me/{settings.liff_id}"
-        await LineService.reply_messages(reply_token, [
-            LineService.build_insufficient_credits_message(liff_url)
-        ])
-        return
+        await UserService.add_credits(db, user.line_uid, 3, reason="測試期自動補充")
+        await db.commit()
+        user.credits = 3
 
     # 確認每日合成上限（成本控制）
     daily_count = await get_daily_synthesis_count()
@@ -111,14 +109,11 @@ async def _handle_theme_selected(reply_token: str, db: AsyncSession, user, theme
     from app.models import SynthesisJob
     from app.utils.redis_client import increment_daily_synthesis_count
 
-    # 再次確認點數（防 race condition）
+    # 確認點數（測試期間若不足自動補充）
+    if user.credits <= 0:
+        await UserService.add_credits(db, user.line_uid, 3, reason="測試期自動補充")
+        await db.commit()
     success, remaining = await UserService.deduct_credits(db, user.line_uid)
-    if not success:
-        liff_url = f"https://liff.line.me/{settings.liff_id}"
-        await LineService.reply_messages(reply_token, [
-            LineService.build_insufficient_credits_message(liff_url)
-        ])
-        return
 
     # 建立 Job 記錄
     job = SynthesisJob(
