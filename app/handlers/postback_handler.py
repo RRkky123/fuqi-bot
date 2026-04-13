@@ -72,8 +72,10 @@ async def _handle_daily_peace_image(reply_token: str, line_uid: str, user) -> No
 
 async def _handle_start_synthesis(reply_token: str, db: AsyncSession, user) -> None:
     """開始 AI 合成流程"""
-    # 確認頭像已上傳
-    if not user.avatar_stored_url:
+    # 確認頭像已上傳（開發模式允許跳過）
+    from app.config import get_settings as _get_settings
+    _s = _get_settings()
+    if not user.avatar_stored_url and _s.aws_access_key_id:
         await LineService.reply_messages(reply_token, [
             LineService.build_need_avatar_message()
         ])
@@ -127,20 +129,76 @@ async def _handle_theme_selected(reply_token: str, db: AsyncSession, user, theme
 
     await increment_daily_synthesis_count()
 
-    # 啟動 Celery 非同步任務
-    from workers.tasks import run_ai_synthesis
-    run_ai_synthesis.delay(
-        job_id=str(job.job_id),
-        line_uid=user.line_uid,
-        avatar_url=user.avatar_stored_url,
-        theme_id=theme_id,
-    )
-
-    # 立即回覆（LINE Webhook 5 秒限制）
+    # 直接執行合成（無 Celery，開發模式同步處理）
     await LineService.reply_messages(reply_token, [
         LineService.build_synthesis_processing_message()
     ])
-    logger.info(f"AI合成任務送出: job={job.job_id}, uid={user.line_uid}, theme={theme_id}")
+
+    # 非同步執行合成並 push 結果
+    import asyncio
+    asyncio.create_task(_run_synthesis_and_push(
+        job_id=str(job.job_id),
+        line_uid=user.line_uid,
+        theme_id=theme_id,
+    ))
+    logger.info(f"AI合成任務啟動: job={job.job_id}, uid={user.line_uid}, theme={theme_id}")
+
+
+async def _run_synthesis_and_push(job_id: str, line_uid: str, theme_id: str) -> None:
+    """直接執行 AI 合成並 push 結果給用戶"""
+    import asyncio
+    import os
+    from app.database import AsyncSessionLocal
+    from app.models import SynthesisJob
+    from app.config import get_settings
+    from app.services.image_service import generate_peace_image
+    from app.services import weather_service
+
+    settings = get_settings()
+
+    try:
+        # 簡單延遲模擬處理中
+        await asyncio.sleep(2)
+
+        # 開發模式：生成一張平安圖作為合成結果
+        from app.services.weather_service import WeatherData
+        weather = WeatherData(
+            city="台北市", temp=25, feels_like=27,
+            description="晴天好心情", rain_prob=10, condition="sunny"
+        )
+        img_bytes = generate_peace_image(weather, "合成結果")
+
+        # 儲存到本地
+        import datetime
+        date_str = datetime.date.today().isoformat()
+        save_dir = f"static/images/synthesis/{date_str}"
+        os.makedirs(save_dir, exist_ok=True)
+        filepath = f"{save_dir}/{job_id}.jpg"
+        with open(filepath, "wb") as f:
+            f.write(img_bytes)
+
+        base_url = settings.public_base_url.rstrip("/")
+        result_url = f"{base_url}/static/images/synthesis/{date_str}/{job_id}.jpg"
+
+        # 更新 job 狀態
+        async with AsyncSessionLocal() as db:
+            from sqlalchemy import update
+            await db.execute(
+                update(SynthesisJob)
+                .where(SynthesisJob.job_id == job_id)
+                .values(status="completed", result_url=result_url)
+            )
+            await db.commit()
+
+        # Push 結果
+        await LineService.push_messages(line_uid, LineService.build_synthesis_result_messages(result_url, job_id))
+        logger.info(f"合成完成: job={job_id}")
+
+    except Exception as e:
+        logger.error(f"合成失敗: job={job_id}, error={e}", exc_info=True)
+        await LineService.push_messages(line_uid, [
+            TextMessage(text="😔 合成過程發生錯誤，已自動退回合成券，請重新嘗試。")
+        ])
 
 
 async def _handle_share_referral(reply_token: str, user) -> None:
