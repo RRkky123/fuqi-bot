@@ -15,6 +15,7 @@ from linebot.v3.messaging import (
     FlexBubble,
     FlexBox,
     FlexButton,
+    FlexCarousel,
     FlexImage,
     FlexMessage,
     FlexText,
@@ -181,38 +182,33 @@ class LineService:
         # Flex Message Carousel
         bubbles = []
         for theme in themes:
-            bubble = {
-                "type": "bubble",
-                "body": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {"type": "text", "text": theme["name"], "weight": "bold", "size": "lg"},
-                        {"type": "text", "text": theme["desc"], "size": "sm", "color": "#888888", "wrap": True},
+            bubble = FlexBubble(
+                body=FlexBox(
+                    layout="vertical",
+                    contents=[
+                        FlexText(text=theme["name"], weight="bold", size="lg"),
+                        FlexText(text=theme["desc"], size="sm", color="#888888", wrap=True),
                     ],
-                },
-                "footer": {
-                    "type": "box",
-                    "layout": "vertical",
-                    "contents": [
-                        {
-                            "type": "button",
-                            "action": {
-                                "type": "postback",
-                                "label": "選擇這個主題",
-                                "data": f"action=select_theme&theme_id={theme['id']}",
-                            },
-                            "style": "primary",
-                            "color": "#D62B2B",
-                        }
+                ),
+                footer=FlexBox(
+                    layout="vertical",
+                    contents=[
+                        FlexButton(
+                            action=PostbackAction(
+                                label="選擇這個主題",
+                                data=f"action=select_theme&theme_id={theme['id']}",
+                            ),
+                            style="primary",
+                            color="#D62B2B",
+                        )
                     ],
-                },
-            }
+                ),
+            )
             bubbles.append(bubble)
 
         return FlexMessage(
             alt_text="請選擇 AI 合成主題",
-            contents={"type": "carousel", "contents": bubbles},
+            contents=FlexCarousel(contents=bubbles),
         )
 
     @staticmethod
