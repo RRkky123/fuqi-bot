@@ -49,8 +49,12 @@ async def handle_message(event: MessageEvent, db: AsyncSession) -> None:
 
     user = await UserService.get_by_uid(db, line_uid)
     if not user:
-        # 未註冊（理論上 follow 時已建立）
-        await LineService.reply_messages(reply_token, [LineService.build_welcome_messages("朋友")[0]])
+        # 未在 DB 找到 → 自動建立（可能錯過 follow 事件）
+        user, _ = await UserService.get_or_create(db, line_uid, "朋友")
+        await db.commit()
+        await set_user_state(line_uid, UserState.WAITING_AVATAR)
+        messages = LineService.build_welcome_messages(user.display_name)
+        await LineService.reply_messages(reply_token, messages)
         return
 
     state = await get_user_state(line_uid)
