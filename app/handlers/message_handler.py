@@ -213,14 +213,22 @@ async def _generate_peace_image_by_city(
 
 
 async def _upload_temp_image(img_bytes: bytes, line_uid: str, date_str: str) -> str:
-    """上傳平安圖至 S3，回傳 CDN URL"""
+    """上傳平安圖：有 AWS 就上 S3，否則存本地靜態目錄透過 ngrok 回傳"""
     import boto3
+    import os
     from app.config import get_settings
     settings = get_settings()
 
     if not settings.aws_access_key_id:
-        # 開發模式：回傳佔位圖
-        return "https://placehold.co/1024x1024/FF6B6B/white?text=平安圖（開發模式）"
+        # 開發模式：存到本地 static 目錄，透過 ngrok URL 回傳
+        save_dir = f"static/images/daily/{date_str}"
+        os.makedirs(save_dir, exist_ok=True)
+        filename = f"{line_uid}.jpg"
+        filepath = f"{save_dir}/{filename}"
+        with open(filepath, "wb") as f:
+            f.write(img_bytes)
+        base_url = settings.public_base_url.rstrip("/")
+        return f"{base_url}/static/images/daily/{date_str}/{filename}"
 
     s3 = boto3.client(
         "s3",
