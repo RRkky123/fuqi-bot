@@ -57,18 +57,39 @@ FESTIVAL_QUOTES = {
 }
 
 
-def _get_font(size: int) -> ImageFont.FreeTypeFont:
+def _ensure_font() -> None:
+    """若本地字型不存在，自動下載 Noto Sans CJK"""
     if FONT_PATH.exists():
-        return ImageFont.truetype(str(FONT_PATH), size)
-    # 嘗試系統字型
+        return
+    FONTS_DIR.mkdir(exist_ok=True)
     system_fonts = [
         "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/truetype/noto/NotoSansCJK-Regular.ttc",
+        "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
         "/System/Library/Fonts/PingFang.ttc",
         "/Windows/Fonts/msjh.ttc",
     ]
     for path in system_fonts:
         if os.path.exists(path):
-            return ImageFont.truetype(path, size)
+            import shutil
+            shutil.copy(path, FONT_PATH)
+            logger.info(f"字型複製自：{path}")
+            return
+    # 從 Google Fonts 下載
+    try:
+        import urllib.request
+        url = "https://github.com/googlefonts/noto-cjk/raw/main/Sans/OTF/TraditionalChinese/NotoSansCJKtc-Regular.otf"
+        logger.info("正在下載中文字型...")
+        urllib.request.urlretrieve(url, str(FONT_PATH))
+        logger.info("字型下載完成")
+    except Exception as e:
+        logger.warning(f"字型下載失敗：{e}")
+
+
+def _get_font(size: int) -> ImageFont.FreeTypeFont:
+    _ensure_font()
+    if FONT_PATH.exists():
+        return ImageFont.truetype(str(FONT_PATH), size)
     return ImageFont.load_default()
 
 
